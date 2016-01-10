@@ -1,0 +1,7 @@
+---
+title: "Practical Machine Learning - Week 2"
+author: "Saul Lugo"
+date: "January 11, 2016"
+output: pdf_document
+---
+
