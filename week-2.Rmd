@@ -5,3 +5,66 @@ date: "January 11, 2016"
 output: pdf_document
 ---
 
+#Splitting Data, Plotting Predictors and Training Models
+The following are examples of how to split the data set in training and testing sets, how to train the model and how to plot the predictors to analyze the relationship between the predictors and the outcome.
+
+#Loading the Data
+Is this example, the ISLR packages is used. This package has a dataset of Wages in the US.
+
+```{r loading_data}
+require(ISLR); require(ggplot2); require(caret);
+data(Wage)
+head(Wage)
+summary(Wage)
+```
+
+#Splitting the Data into Training and Test set
+
+```{r splitting_data}
+inTrain <- createDataPartition(y = Wage$wage, p = 0.7, list = FALSE)
+training <- Wage[inTrain,]
+testing <- Wage[-inTrain,]
+dim(training); dim(testing)
+```
+
+#Plotting Predictors vs Outcome
+
+```{r plotting}
+#Plotting several predictors vs the outcome
+featurePlot(x = training[,c("age", "education", "jobclass")], y = training$wage, plot="pairs")
+
+#Plotting one variable vs outcome and adding a second variable in the colour
+qplot(age, wage, colour = jobclass,data=training)
+
+#Add regression smoothers
+qq <- qplot(age, wage, colour=education, data=training)
+qq + geom_smooth(method="lm", formula = y ~ x)
+
+#cut2, making factors (Hmisc package)
+require(Hmisc)
+#Splitting the wage variable into groups of quantiles
+cutWage <- cut2(training$wage, g=3)
+table(cutWage)
+#Making a boxplot to see the three different wage groups we created before
+p1 <- qplot(cutWage, age, data=training, fill=cutWage, geom = c("boxplot"))
+p1
+
+#Boxplots with points overlayed
+#If the jitter plot shows a lot of the points inside the boxplots that mean that the boxplots are
+#actually representative of the data, so any trend one might observes might be true.
+#On the contrary if only a few points are shown inside the boxplots, the trend might not be that representative
+p2 <- qplot(cutWage, age, data = training, fill = cutWage, geom = c("boxplot","jitter"))
+#grid.arrange(p1, p2, ncol=2)
+p2
+
+#One can make also tables
+t1 <- table(cutWage,training$jobclass)
+t2 <- table(cutWage,training$race)
+t3 <- table(cutWage,training$education)
+t1; t2; t3
+
+#One can also use prop.table to get the proportion on each group
+prop.table(t2,1)
+
+#Also, one can do Density Plots
+qplot(wage, colour=education, data=training, geom="density")
