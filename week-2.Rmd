@@ -68,3 +68,127 @@ prop.table(t2,1)
 
 #Also, one can do Density Plots
 qplot(wage, colour=education, data=training, geom="density")
+```
+
+#Preprocessing Predictor Values
+
+```{r preprocessing}
+library(caret)
+library(kernlab)
+data(spam)
+inTrain <- createDataPartition(y=spam$type, p=0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+hist(training$capitalAve,main="Capital in a Row in the emails of the dataset",xlab="ave. capital run length")
+mean(training$capitalAve)
+sd(training$capitalAve)
+```
+It can be observed that this variable is highly skewed. So it can be improved by preprocessing.
+
+##Preprocessing by Normalization (Standarization)
+To standarize a variable one must substract the mean and divide the result by the SD of the variable:
+
+```{r standarize}
+trainCapAve <- training$capitalAve
+trainCapAveS <- (trainCapAve - mean(trainCapAve))/sd(trainCapAve)
+round(mean(trainCapAveS),4)
+round(sd(trainCapAveS),4)
+```
+
+Also, the function **preProcess** can be used for standarization:
+
+```{r standarize_function}
+preObj <- preProcess(training[,-58],method=c("center","scale"))
+trainCapAveS <- predict(preObj,training[,-58])$capitalAve
+mean(trainCapAveS)
+sd(trainCapAveS)
+```
+
+If the standarization is done in the test set, the mean and the SD of the training set must be use still. However, after standarized the test set variable the mean of the standarized variable will not be exactly zero neither the SD will be exactly one:
+
+```{r standarization_over_testing_set}
+testCapAveS <- predict(preObj,testing[,-58])$capitalAve
+mean(testCapAveS)
+sd(testCapAveS)
+```
+
+The **preProcess** function can be passed directly to the **train** function:
+
+```{r training_model}
+set.seed(32343)
+modelFit <- train(type ~ ., data=training, preProcess=c("center","scale"),method="glm")
+modelFit
+```
+
+Other transformation available is the **BoxCox** transformation:
+
+```{r box_cox_transformation}
+preObj <- preProcess(training[,-58],method=c("BoxCox"))
+trainCapAveS <- predict(preObj, training[,-58])$capitalAve
+par(mfrow=c(1,2)); hist(trainCapAveS); qqnorm(trainCapAveS)
+```
+
+##Preprocessing Imputing Missing Values
+
+If the dataset has missing values, those can be imputing using **K-nearest neighbor's imputation** algorithm:
+
+```{r knearest}
+#Make some values NA
+training$capAve <- training$capitalAve
+selectNA <- rbinom(dim(training)[1], size=1, prob=0.05)==1
+training$capAve[selectNA] <- NA
+
+#Impute and Standarize
+preObj <- preProcess(training[,-58],method="knnImpute")
+capAve <- predict(preObj, training[,-58])$capAve
+
+#Standarize true values
+capAveTruth <- training$capitalAve
+capAveTruth <- (capAveTruth-mean(capAveTruth))/sd(capAveTruth)
+```
+
+#Creating Covariates (or Features)
+
+In case that one of the predictors is a factor variable, it is better to transform that variable into dummy variables. Prediction algoritms work better with dummy variables than with factor variables:
+
+```{r dummy_variables}
+library(ISLR); library(caret); data(Wage);
+inTRain <- createDataPartition(y=Wage$wage, p=0.7, list=FALSE)
+training <- Wage[inTrain,]; testing <- Wage[-inTrain,];
+
+#converting the jobclass variable from a qualitative variable to a quantivative variable
+#using dummyVars function from the caret package
+table(training$jobclass)
+dummies <- dummyVars(wage ~ jobclass, data=training)
+head(predict(dummies, newdata=training))
+```
+
+##Removing zero covariates
+
+In order to detect those variables that has close to none variability, and therefore are not useful for prediction, one can use the **nearZerVar** function:
+
+```{r nzv_function}
+nsv <- nearZeroVar(training, saveMetrics=TRUE)
+nsv
+```
+
+##Principal Componen Analysis (PCA)
+
+```{r pca}
+library(caret)
+library(kernlab)
+data(spam)
+inTrain <- createDataPartition(y=spam$type, p=0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+
+#PCA using the basic pacakge funtion prcomp
+typeColor <- ((spam$type=="spam")*1 + 1) #clasifies each point for coloring as spam or ham
+prComp <- prcomp(log10(spam[,-58]+1)) #the log10 is to make the variables look more "normal"
+plot(prComp$x[,1],prComp$x[,2],col=typeColor,xlab="PC1",ylab="PC2")
+
+#PCA using the caret package
+preProc <- preProcess(log10(spam[,-58]+1),method="pca",pcaComp=2)
+spamPC <- predict(preProc,log10(spam[,-58]+1))
+plot(spamPC[,1],spamPC[,2],col=typeColor)
+```
