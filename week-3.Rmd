@@ -1,0 +1,40 @@
+---
+title: "Practical Machine Learning - Week3"
+author: "Saul Lugo"
+date: "January 22, 2016"
+output: pdf_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, chache=TRUE)
+```
+#Predicting with Trees
+The basic algorithm for predicting with trees is the following:
+
+1) Start with all the variables in one group
+2) Find the variable/split that best separates the outcomes
+3) Divide the data into two groups ("leaves") on that split
+4) Within each split, find the variable that best separates the outcome
+5) Continue until the groups are too small or sufficiently pure
+
+##Example with the Iris dataset
+
+```{r iris_prediction}
+data(iris)
+library(ggplot2)
+library(caret)
+names(iris)
+
+table(iris$Species)
+
+#Create the data partition
+inTrain <- createDataPartition(y=iris$Species,p=0.7,list=FALSE)
+training <- iris[inTrain,]
+testing <- iris[-inTrain,]
+dim(training); dim(testing)
+
+#Exploring the data
+qplot(Petal.Width,Sepal.Width,colour=Species,data=training)
+
+#Training the model (a tree model)
+modFit <- train(Species ~ ., method="rpart", data = training)
+print(modFit$finalModel)

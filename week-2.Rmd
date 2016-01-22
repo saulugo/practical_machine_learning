@@ -5,6 +5,10 @@ date: "January 11, 2016"
 output: pdf_document
 ---
 
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, chache=TRUE)
+```
+
 #Splitting Data, Plotting Predictors and Training Models
 The following are examples of how to split the data set in training and testing sets, how to train the model and how to plot the predictors to analyze the relationship between the predictors and the outcome.
 
@@ -191,4 +195,67 @@ plot(prComp$x[,1],prComp$x[,2],col=typeColor,xlab="PC1",ylab="PC2")
 preProc <- preProcess(log10(spam[,-58]+1),method="pca",pcaComp=2)
 spamPC <- predict(preProc,log10(spam[,-58]+1))
 plot(spamPC[,1],spamPC[,2],col=typeColor)
+
+#One can fit a model with the Training set and the principal componets
+preProc <- preProcess(log10(training[,-58]+1),method="pca",pcaComp=2)
+trainPC <- predict(preProc,log10(training[,-58]+1))
+modelFit <- train(training$type ~ .,method="glm",data=trainPC)
+modelFit
+confusionMatrix(training$type,predict(modelFit,trainPC))
+
+#Now in the test dataset
+testPC <- predict(preProc,log10(testing[,-58]+1)) #one must use the same preProc obj calculated for the training
+confusionMatrix(testing$type,predict(modelFit,testPC)) #one must also use the same model fitted for the trining
+
+#Another way of train the model and use the PCA in the preprocessing at the same time:
+modelFit <- train(training$type ~ .,method="glm",preProcess="pca",data=training)
+confusionMatrix(training$type,predict(modelFit,training))
+confusionMatrix(testing$type,predict(modelFit,testing))
 ```
+
+#Predicting with Regression Models
+Linear Models using the caret package:
+
+```{r lm_caret}
+library(MASS)
+data(faithful); set.seed(333)
+inTrain <- createDataPartition(y=faithful$eruptions, p=0.5, list=FALSE)
+trainFaith <- faithful[inTrain,]; testFaith <- faithful[-inTrain,]
+head(trainFaith)
+
+modFit <- train(eruptions ~ waiting,data=trainFaith,method="lm")
+summary(modFit$finalModel)
+plot(trainFaith$waiting,trainFaith$eruptions)
+lines(trainFaith$waiting,modFit$finalModel$fitted,col="blue")
+```
+
+#Predicting with Regression Models with Multiple variable
+
+```{r mv_lm}
+library(ISLR); library(ggplot2); library(caret)
+data(Wage); Wage <- subset(Wage,select=-c(logwage))
+summary(Wage)
+
+#Splitting the data
+inTrain <- createDataPartition(y=Wage$wage,p=0.7,list=FALSE)
+training <- Wage[inTrain,]; testing <- Wage[-inTrain,]
+dim(training); dim(testing)
+
+#fitting a linear model
+modFit <- train(wage ~ age + jobclass + education, method="lm", data=training) #we fit the model on the training data
+
+fitMod <- modFit$finalModel
+print(modFit)
+
+#Plotting the fitted values vs the residuals
+plot(fitMod,1,pch=19,cex=0.5,col="#00000010")
+#You can see there are some outliers in the residuals
+#Let't plot fitted vs residuals and add the race variable and see if that variable explains the outliers in the residuals
+qplot(fitMod$fitted, fitMod$residuals, colour=race, data=training)
+#You see that the outliers might be explained by the race variable
+#also plot the residuals accross the dataset and see if there is a patron. The residual should be random
+plot(fitMod$residuals,pch=19)
+
+#Predicted versus true values in the test set
+pred <- predict(modFit, testing)
+qplot(wage, pred, colour=year,data=testing)

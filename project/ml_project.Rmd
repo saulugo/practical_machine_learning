@@ -1,0 +1,77 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Saul Lugo"
+date: "January 20, 2016"
+output: html_document
+---
+
+#Abstract
+Write here the abstract
+
+#Getting and Cleaning Data
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, chache=TRUE)
+library(ggplot2)
+library(Hmisc)
+library(caret)
+library(dplyr)
+```
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
+```{r getting_data}
+url_training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+if(!file.exists("./data")) dir.create("./data")
+file_training <- "./data/pml-training.csv"
+file_testing <- "./data/pml-testing.csv"
+if(!file.exists(file_training))
+        download.file(url_training,destfile=file_training,method="curl")
+if(!file.exists(file_testing))
+        download.file(url_testing,destfile=file_testing,method="curl")
+training <- read.csv(file_training)
+testing <- read.csv(file_testing)
+```
+
+##Cleaning the data
+Let's explore the training dataset:
+```{r summary_training}
+summary(training)
+```
+From the summary of the training dataset it can be identify the following issues with the data:
+
+1) The **Euler Angles information** (roll, pitch and yaw angles) seems to be complete and continuos, so not further treatment is needed.
+2) The **Total Accelerometer** (total_accel_XXX variables) seems to be complete and continous, so no further treatment is needed.
+3) The **kurtosis** (kurtosis_roll_XXX, kurtosis_picth_XXX, kurtosis_yaw_XXX variables) were render as factor variables. In order to facilitate the analysis, these variables will be converted to continous numeric variables.
+4) The **skewness** (skewness_roll_XXX, skewness_picth_XXX, skewness_yaw_XXX variables) are also factors variables and will be converted to numeric variables.
+5) The variable **skewness_roll_belt.1** will be dropped. The variable **skewness_roll_belt** will be used in its place.
+6) The variables **max_roll_belt** and **max_picth_belt** has 19216 NAs out of 19622 observations, so those variables will be discarted from the analysis.
+7) The same issue as that of point 6 happens in all the **min_roll_XXX** and **min_pitch_XXX** variables. Also those variables will be discarted from the analysis.
+8) The variables **max_yaw** and **min_yaw** (max_yaw_XXX and min_yaw_XXX variables) were also rendered as factor variables. Those will be converted to numeric continous variables.
+9) As max and min roll and picth variables have most of the values as NAs, the **amplitude** variables have also most of the values in NAs, so **amplitude** variables will be discarted from the analysis.
+10) The same NAs issue (that 19216 values out of 19622 observations are NAs) is encountered in the variables: var_total_accel_XXX, ave_roll_XXX, stddev_roll_XXX, var_roll, and their equivalent for the picth and the yaw angles, so all those variables will be discarted from the analysis.
+11) The variables max_yaw_XXX and min_yaw_XXX has the same values, therefore the variable amplitude_yaw_XX is always zero. So, these variables do not add information and will be discarted from the analysis.
+12) As the machine learning algorithm will be trained to predict if the exercise was done well, the variables related to timestamp, window and the name of the person executing the exercise are irrelevant. Those variables will be dropped.
+13) Finally, the variables related to the gyros, accel and magnet measurements in all the sensors (belt, arm, forearm and dumbbell) seems to be numeric, continous and complete, so all those will be included in the analysis.
+
+The following code chunk deals with the cleaning of the data following the previous 13 remarks about the dataset:
+
+```{r cleaning_data}
+#eliminating columns with more than 80% of the values in NAs
+training <- training[,!colSums(is.na(training))>0.8*nrow(training)]
+#transforming to numeric the kurtosis variables
+training[,grep("kurtosis",names(training))] <- lapply(training[,grep("kurtosis",names(training))],as.numeric)
+#transforming to numeric the skewness variables
+training[,grep("skewness",names(training))] <- lapply(training[,grep("skewness",names(training))],as.numeric)
+#eliminating the column "skewness_roll_belt.1""
+training <- training[,names(training)!="skewness_roll_belt.1"]
+#eliminating the variables max_yaw_XXX, min_yaw_XXX, amplitude_yaw_XXX
+training <- training[,-grep("max_yaw",names(training))]
+training <- training[,-grep("min_yaw",names(training))]
+training <- training[,-grep("amplitude_yaw",names(training))]
+#eliminating irrelevant variables for the analysis
+training <- training[,names(training)!="user_name"]
+training <- training[,-grep("timestamp",names(training))]
+training <- training[,-grep("window",names(training))]
+training <- training[,-1]
+dim(training)
+summary(training)
+```
