@@ -6,7 +6,11 @@ output: html_document
 ---
 
 #Abstract
-Write here the abstract
+The following analysis is based in a research conducted by a groupd of academics interested in [Human Activity Recognition (HAR)](http://groupware.les.inf.puc-rio.br/har). The idea is based in that nowadays people is interested in quantify how *much* of a particular activity they do, but they rarely quantify *how well* they do it. The dataset was taken from the research group's website. The training dataset has more than 19 thousand observations of 6 males doing a weight lifting exercise. On each observation the outcome variable (named **classe** in the dataset) has one of five possible values (A, B, C, D, E) in which A corresponds to the exercise done correctly and B to E correspond to four typical mistakes people do when perform the exercise. Each individual performing the exercise was wearing four sensors, each of them installed in the dumbbell, the belt, the arm and the forearm. These sensors provides measurements of the Euler Angles (the spacial position of the sensor), the accelerometer, the gyroscope and the magnet.
+
+The objective of this analysis is to **train a model** that is able to predict if an especific repetition of the weight lifting exercise was done correctly or not specifying the outcomes (A,B,C,D,E). The predictors are all the measurements of euler angles, gyroscope, accelerometer and magnet provided by the body sensors.
+
+A **Random Forrest model** was trained using parallel processing and a 99.24% accuracy was obtained.
 
 #Getting and Cleaning Data
 ```{r global_options, include=FALSE}
@@ -192,3 +196,14 @@ The **allowParallel** parameter tells the caret's train() function to use the pa
 
 ##Model training using parallel processing
 
+The following code chunk deals with the model training using **caret package random forrest** and parallel processing:
+
+```{r model_training}
+mytraining <- training
+mytraining <- predictors
+mytraining$y <- training$classe
+set.seed(12748)
+system.time(modFit <- train(y ~.,data=mytraining,method="rf",trControl=fitControl))
+print(modFit)
+modFit$finalModel
+```
