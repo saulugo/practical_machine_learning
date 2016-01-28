@@ -32,27 +32,18 @@ testing <- read.csv(file_testing)
 ```
 
 ##Cleaning the data
-Let's explore the training dataset:
-```{r summary_training}
-summary(training)
-```
 From the summary of the training dataset it can be identify the following issues with the data:
 
-1) The **Euler Angles information** (roll, pitch and yaw angles) seems to be complete and continuos, so not further treatment is needed.
-2) The **Total Accelerometer** (total_accel_XXX variables) seems to be complete and continous, so no further treatment is needed.
-3) The **kurtosis** (kurtosis_roll_XXX, kurtosis_picth_XXX, kurtosis_yaw_XXX variables) were render as factor variables. In order to facilitate the analysis, these variables will be converted to continous numeric variables.
-4) The **skewness** (skewness_roll_XXX, skewness_picth_XXX, skewness_yaw_XXX variables) are also factors variables and will be converted to numeric variables.
-5) The variable **skewness_roll_belt.1** will be dropped. The variable **skewness_roll_belt** will be used in its place.
-6) The variables **max_roll_belt** and **max_picth_belt** has 19216 NAs out of 19622 observations, so those variables will be discarted from the analysis.
-7) The same issue as that of point 6 happens in all the **min_roll_XXX** and **min_pitch_XXX** variables. Also those variables will be discarted from the analysis.
-8) The variables **max_yaw** and **min_yaw** (max_yaw_XXX and min_yaw_XXX variables) were also rendered as factor variables. Those will be converted to numeric continous variables.
-9) As max and min roll and picth variables have most of the values as NAs, the **amplitude** variables have also most of the values in NAs, so **amplitude** variables will be discarted from the analysis.
-10) The same NAs issue (that 19216 values out of 19622 observations are NAs) is encountered in the variables: var_total_accel_XXX, ave_roll_XXX, stddev_roll_XXX, var_roll, and their equivalent for the picth and the yaw angles, so all those variables will be discarted from the analysis.
-11) The variables max_yaw_XXX and min_yaw_XXX has the same values, therefore the variable amplitude_yaw_XX is always zero. So, these variables do not add information and will be discarted from the analysis.
-12) As the machine learning algorithm will be trained to predict if the exercise was done well, the variables related to timestamp, window and the name of the person executing the exercise are irrelevant. Those variables will be dropped.
-13) Finally, the variables related to the gyros, accel and magnet measurements in all the sensors (belt, arm, forearm and dumbbell) seems to be numeric, continous and complete, so all those will be included in the analysis.
+1) The **kurtosis** (kurtosis_roll_XXX, kurtosis_picth_XXX, kurtosis_yaw_XXX variables) were render as factor variables. In order to facilitate the analysis, these variables will be converted to continous numeric variables.
+2) The **skewness** (skewness_roll_XXX, skewness_picth_XXX, skewness_yaw_XXX variables) are also factors variables and will be converted to numeric variables.
+3) The variable **skewness_roll_belt.1** will be dropped. The variable **skewness_roll_belt** will be used in its place.
+4) There are a group of variables that have 19216 NAs out of 19622 observations. Those variables will not add valuable information to train the prediction model; therefore, those variables will be eliminated from the analysis.
+5) The variables **max_yaw** and **min_yaw** (max_yaw_XXX and min_yaw_XXX variables) were also rendered as factor variables. Those will be converted to numeric continous variables.
+6) As max and min roll and picth variables have most of the values as NAs, the **amplitude** variables have also most of the values in NAs, so **amplitude** variables will be discarted from the analysis.
+7) The variables max_yaw_XXX and min_yaw_XXX has the same values, as a result the variable amplitude_yaw_XX is always zero. So, these variables do not add information and will be discarted from the analysis.
+8) As the machine learning algorithm will be trained to predict if the exercise was done well, the variables related to timestamp, window and the name of the person executing the exercise are irrelevant. Those variables will be dropped.
 
-The following code chunk deals with the cleaning of the data following the previous 13 remarks about the dataset:
+The following code chunk deals with the cleaning of the data following the previous 8 remarks about the dataset:
 
 ```{r cleaning_data}
 #eliminating columns with more than 80% of the values in NAs
@@ -73,5 +64,131 @@ training <- training[,-grep("timestamp",names(training))]
 training <- training[,-grep("window",names(training))]
 training <- training[,-1]
 dim(training)
-summary(training)
 ```
+
+#Exploratory Data Analysis
+The sensors that the individuals in the experiment were wearing provide the following measurements: the euler angles (roll, pitch and yaw) at each step of the sliding window and the raw accelerometer, gyroscope and magnetometer readings. One can expect that the likelihood that a weight lifting exercise is being executed correctly or incorrectly will depend highly in the position of the dumbbell at each time, then the euler angles for the dumbbell should be very important predictors in this experiment.
+
+Following this reasoning, let's explore some plots of the relationshipt of the euler angles in the dumbbell and the outcome of the exercises:
+
+```{r exploratory_1}
+library(ggplot2)
+library(plot3D)
+
+par(mar=c(5.1,4.1,4.1,2.1))
+x <- training$roll_dumbbell
+y <- training$pitch_dumbbell
+z <- training$yaw_dumbbell
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="yaw",main="Exercise Execution vs Dumbbell Euler Angles",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+It can be observed in the previous plot that the yaw angle in the dumbbell differences the correct and incorrect execution of the exercise.
+
+Also, differentiation can be observed if we change the z variable for other measurements like the total accelerometer of the dumbbell, and plot it against the dumbbell's roll and pitch angle:
+
+```{r exploratory_2}
+# Let's change z to be the total_accel_dumbbell variable
+z <- training$total_accel_dumbbell
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="total_accel",main="Dumbbell - roll/pitch vs total_accel",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+As with the last plot, separation can be appreciated changing the variable z by the dumbbell magnet_z:
+
+```{r exploratory_3}
+# Let's change z to be the total_accel_dumbbell variable
+z <- training$magnet_dumbbell_z
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="magnet_z",main="Dumbbell - roll/pitch vs magnet_z",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+It is intuitive to assume that the Euler Angles in the other sensors (arm, forearm and belt) will also predict some separation in the outcome of the exercise. The following plot shows the Euler Angles vs the Outcome in the arm sensor:
+
+```{r exploratory_4}
+library(ggplot2)
+library(plot3D)
+
+par(mar=c(5.1,4.1,4.1,2.1))
+x <- training$roll_arm
+y <- training$pitch_arm
+z <- training$yaw_arm
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="yaw",main="Exercise Execution vs Arm Euler Angles",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+The following plot shows the angles in the Belt Sensor:
+
+```{r exploratory_5}
+library(ggplot2)
+library(plot3D)
+
+par(mar=c(5.1,4.1,4.1,2.1))
+x <- training$roll_belt
+y <- training$pitch_belt
+z <- training$yaw_belt
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="yaw",main="Exercise Execution vs Belt Euler Angles",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+And finally the following plot shows the angles in the forearm sensor:
+
+```{r exploratory_6}
+library(ggplot2)
+library(plot3D)
+
+par(mar=c(5.1,4.1,4.1,2.1))
+x <- training$roll_forearm
+y <- training$pitch_forearm
+z <- training$yaw_forearm
+scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="yaw",main="Exercise Execution vs Forearm Euler Angles",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
+```
+
+As a conclusion from the Exploratory Data Analysis, it can be appreciated that the Euler Angles show separation in all the sensors, and specially in the Dumbbell sensor. Also, whan an additional variable related to the magnet or the accelerometer is added to the plot separation is apparent as well.
+
+#Predictors Selection
+
+From the Exploratory Data Analysis, it can be inferred that all the sensors measurements related to Euler Angles, gyroscope, magnet and accelerometer will be important as predictors of the outcome of the exercise execution.
+
+However, even after the Data Cleaning, 75 variables still remain in the training dataset.
+
+**The correlation between the variables** was used as the method to reduce the amount of variables (75) to a smaller group that still explains most of the variance in the outcome. As a threshold, the new smaller groupd of variable is conformed for variables that has less than 75% of correlation between all of them. The following code chunk uses the functions **cor()** to build a **correlation matrix** between the variables and **findCorrelation()** from the caret packages to find which variables will exceed this threshold of 75% correlation with the other variables and therefore must be dropped from the analysis:
+
+```{r variables_correlation}
+predictors <- training[,-76]
+names(predictors)
+high_correlation <- findCorrelation(correlation_matrix,cutoff=0.75)
+#now, let's eliminate the predictors with correlations higher than .75
+predictors <- predictors[,-high_correlation]
+names(predictors)
+```
+
+Regarding the Euler Angles, the variables correlation algorithms eliminates the roll and pitch angle from the belt sensor and leave the yaw angle. For the dumbbell, arm and forearm leaves all the angles. This in line with the observations done in the Exploratory Data Analysis. Also, the measurements from the gyroscope, accelerometer and magnet that explain the most variance in the outcome were left in the predictors group.
+
+#Training the Model
+
+The model selected for this analysis was **Random Forrest (RF)**. This algorithm is highly accurate for classifications problems. However it is also highly computational demanding, and it can takes hours running in a regular personal computer.
+
+##Parallel Processing Setup
+In order to make the RF algorithm more efficient, a parallel setup was used. The computer in which this analysis was run has the following characteristics:
+- A macbook air
+- 1.3 GHz Inte Core i5 with 4 Cores
+- 4 GB of RAM
+- OS X Version 10.9.5
+
+The following code chunk configures the parallels processing in 3 of the 4 cores that the computer has:
+
+```{r parallel_processing}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+```
+
+##Cross-Validation
+
+For cross-validation, a **k-fold** algorithm with k = 10 will be used. In the caret package, the cross-validation is configured in the **trainControl** object:
+
+```{r train_control_object}
+fitControl <- trainControl(method="cv",number=10,allowParallel=TRUE)
+```
+
+The **allowParallel** parameter tells the caret's train() function to use the parallel processing.
+
+##Model training using parallel processing
+
