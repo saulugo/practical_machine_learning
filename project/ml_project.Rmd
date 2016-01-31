@@ -143,7 +143,7 @@ z <- training$yaw_forearm
 scatter3D(x,y,z,colvar=as.integer(training$classe),col=c("green","red","blue","black","orange"),pch=16,cex=1,clim=c(1,5),ticktype="detailed",phi=20,theta=20,xlab="roll",ylab="pitch",zlab="yaw",main="Exercise Execution vs Forearm Euler Angles",colkey = list(at = c(1,2,3,4,5),side = 1,addlines=FALSE,length=0.5,width=0.5,labels=c("A","B","C","D","E")))
 ```
 
-As a conclusion from the Exploratory Data Analysis, it can be appreciated that the Euler Angles show separation in all the sensors, and specially in the Dumbbell sensor. Also, whan an additional variable related to the magnet or the accelerometer is added to the plot separation is apparent as well.
+As a conclusion from the Exploratory Data Analysis, it can be appreciated that the Euler Angles show separation in all the sensors, and specially in the Dumbbell sensor. Also, when an additional variable related to the magnet or the accelerometer is added to the plot separation is apparent as well.
 
 #Predictors Selection
 
@@ -151,18 +151,19 @@ From the Exploratory Data Analysis, it can be inferred that all the sensors meas
 
 However, even after the Data Cleaning, 75 variables still remain in the training dataset.
 
-**The correlation between the variables** was used as the method to reduce the amount of variables (75) to a smaller group that still explains most of the variance in the outcome. As a threshold, the new smaller groupd of variable is conformed for variables that has less than 75% of correlation between all of them. The following code chunk uses the functions **cor()** to build a **correlation matrix** between the variables and **findCorrelation()** from the caret packages to find which variables will exceed this threshold of 75% correlation with the other variables and therefore must be dropped from the analysis:
+**The correlation between the variables** was used as the method to reduce the amount of variables (75) to a smaller group that still explains most of the variance in the outcome. As a threshold, the new smaller groupd of variable is conformed by variables that has less than 75% of correlation between all of them. The following code chunk uses the functions **cor()** to build a **correlation matrix** between the variables and **findCorrelation()** from the caret packages to find which variables will exceed this threshold of 75% correlation with the other variables and therefore must be dropped from the analysis:
 
 ```{r variables_correlation}
 predictors <- training[,-76]
 names(predictors)
+correlation_matrix <- cor(predictors)
 high_correlation <- findCorrelation(correlation_matrix,cutoff=0.75)
 #now, let's eliminate the predictors with correlations higher than .75
 predictors <- predictors[,-high_correlation]
 names(predictors)
 ```
 
-Regarding the Euler Angles, the variables correlation algorithms eliminates the roll and pitch angle from the belt sensor and leave the yaw angle. For the dumbbell, arm and forearm leaves all the angles. This in line with the observations done in the Exploratory Data Analysis. Also, the measurements from the gyroscope, accelerometer and magnet that explain the most variance in the outcome were left in the predictors group.
+Regarding the Euler Angles, the variables correlation algorithm eliminates the roll and pitch angle from the belt sensor and leave the yaw angle. For the dumbbell, arm and forearm the algorithm leaves all the angles. This is in line with the observations done in the Exploratory Data Analysis. Also, the measurements from the gyroscope, accelerometer and magnet that explain the most variance in the outcome were left in the predictors group.
 
 #Training the Model
 
@@ -207,3 +208,24 @@ system.time(modFit <- train(y ~.,data=mytraining,method="rf",trControl=fitContro
 print(modFit)
 modFit$finalModel
 ```
+
+#Prediction in the Testing Dataset
+
+The testing dataset has 20 observations, the following code chunk uses the model fitted in order to predict the outcome for those 20 observations:
+
+```{r }
+fix_na <- function(x){
+        for(i in 1:ncol(x)){
+                if(sum(is.na(x[,i]))>0) x[,i][is.na(x[,i])] <- 0
+        }
+        x
+}
+
+testing[,grep("kurtosis",names(testing))] <- lapply(testing[,grep("kurtosis",names(testing))],as.numeric)
+#transforming to numeric the skewness variables
+testing[,grep("skewness",names(testing))] <- lapply(testing[,grep("skewness",names(testing))],as.numeric)
+testing <- fix_na(testing)
+predict(modFit,testing)
+```
+
+The testing dataset has many variables with all values as NAs. Those NAs were replaced by zero with the helper function **fix_na()** defined in the previous code chunck. Also the *kurtosis* and *skewness* variables were converted from factor variable to numeric variables in order to match the transformation done in the training set.
