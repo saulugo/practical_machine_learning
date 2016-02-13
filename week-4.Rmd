@@ -1,0 +1,307 @@
+---
+title: "Practical Machine Learning - Week4"
+author: "Saul Lugo"
+date: "January 31, 2016"
+output: pdf_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, chache=TRUE)
+```
+
+#Reguralized Regression
+
+##Model Selection Approach: split samples
+
+1. Divide data into training/test/validation sets
+2. Treat validation as a test data, train all competing models on the train data and pick the best one on validation.
+3. To appropriately assess performance on new data apply the model to test set
+4. You might re-split and reperform steps 1-3
+
+#Combining Predictors
+
+The idea is to combine different predictor models in order to improve the accuracy. The following example combines a GLM with a Random Forest predictor:
+
+```{r combining_predictors}
+library(ISLR); data(Wage); library(ggplot2); library(caret);
+Wage <- subset(Wage, select=-c(logwage))
+
+set.seed(1234)
+#Splitting the data into training, testing and validation sets
+inBuild <- createDataPartition(y=Wage$wage,p=0.7,list=FALSE)
+validation <- Wage[-inBuild,]; buildData <- Wage[inBuild,]
+inTrain <- createDataPartition(y=buildData$wage,p=0.7,list=FALSE)
+training <- buildData[inTrain,]; testing <- buildData[-inTrain,]
+
+dim(training); dim(testing); dim(validation);
+
+#Now, fit the two models
+mod1 <- train(wage ~.,method="glm",data=training)
+mod2 <- train(wage ~.,method="rf",data=training,trControl=trainControl(method="cv",number=3))
+
+mod1
+mod2
+
+#plotting mod1 vs mod2
+
+pred1 <- predict(mod1,testing); pred2 <- predict(mod2,testing);
+qplot(pred1,pred2,colour=wage,data=testing)
+
+#Fit a model that combines both predictors
+predDF <- data.frame(pred1,pred2,wage=testing$wage)
+combModFit <- train(wage ~.,method="gam",data=predDF)
+combPred <- predict(combModFit,predDF)
+combModFit
+
+#Comparing the Root Squared Errors between mod1, mod2 and the combined model
+sqrt(sum(pred1-testing$wage)^2)
+sqrt(sum(pred2-testing$wage)^2)
+sqrt(sum(combPred-testing$wage)^2)
+
+#Checking the model on the validation set
+pred1V <- predict(mod1,validation); pred2V <- predict(mod2,validation)
+predVDF <- data.frame(pred1=pred1V,pred2=pred2V)
+combPredV <- predict(combModFit,predVDF)
+
+#Checking the RSE on the validation set
+sqrt(sum(pred1V-validation$wage)^2)
+sqrt(sum(pred2V-validation$wage)^2)
+sqrt(sum(combPredV-validation$wage)^2)
+```
+
+#Unsupervised Prediction
+
+When performing unsupervised prediction one does not know the labels of the outcome beforehand.
+
+The following example use clustering technique on the IRIS dataset. We ignore the Species variable in order to simulate that we don't know the outcome. We use clustering by **k-means** in order to build the clusters, then we build a prediciton model using the clusters in the training dataset as the outcome variable:
+
+```{r unsupervised_prediction}
+data(iris)
+library(ggplot2)
+library(caret)
+
+inTrain <- createDataPartition(y=iris$Species,p=.7,list=FALSE)
+training <- iris[inTrain,]
+testing <- iris[-inTrain,]
+dim(training); dim(testing)
+
+#Building the clusters
+kMeans1 <- kmeans(subset(training,select=-c(Species)),centers=3)
+training$clusters <- as.factor(kMeans1$cluster)
+qplot(Petal.Width,Petal.Length,colour=clusters,data=training)
+
+table(kMeans1$cluster,training$Species)
+
+#Fitting the model using the clusters
+modFit <- train(clusters ~.,data=subset(training,select=-c(Species)),method="rpart")
+table(predict(modFit,training),training$Species)
+
+#Apply the model on the test set
+testClusterPred <- predict(modFit,testing)
+table(testClusterPred,testing$Species)
+```
+
+#Quiz-4
+
+Load the vowel.train and vowel.test data sets:
+
+library(ElemStatLearn)
+
+data(vowel.train)
+
+data(vowel.test)
+
+
+
+Set the variable y to be a factor variable in both the training and test set. Then set the seed to 33833. Fit (1) a random forest predictor relating the factor variable y to the remaining variables and (2) a boosted predictor using the "gbm" method. Fit these both with the train() command in the caret package.
+
+What are the accuracies for the two approaches on the test data set? What is the accuracy among the test set samples where the two methods agree?
+
+##Answer
+First let's follow the instructions for build the models:
+
+```{r question_1_building_models}
+library(ElemStatLearn)
+data(vowel.train)
+data(vowel.test)
+head(vowel.train)
+head(vowel.test)
+summary(vowel.train)
+vowel.train$y <- as.factor(vowel.train$y)
+vowel.test$y <- as.factor(vowel.test$y)
+dim(vowel.train)
+dim(vowel.test)
+summary(vowel.train)
+summary(vowel.test)
+set.seed(33833)
+mod_rf <- train(y ~.,method="rf",data=vowel.train)
+mod_rf
+mod_gbm <- train(y ~.,method="gbm",data=vowel.train)
+mod_gbm
+pred_rf <- predict(mod_rf,vowel.test)
+confusionMatrix(pred_rf,vowel.test$y)
+pred_gbm <- predict(mod_gbm,vowel.test)
+confusionMatrix(pred_gbm,vowel.test$y)
+testing <- vowel.test
+testing$pred_rf <- pred_rf
+testing$pred_gbm <- pred_gbm
+subtesting <- testing[testing$pred_rf == testing$pred_gbm,]
+confusionMatrix(subtesting$pred_rf,subtesting$y)
+```
+
+#Question2
+Load the Alzheimer's data using the following commands
+
+-code-library(caret)
+
+library(gbm)
+
+set.seed(3433)
+
+library(AppliedPredictiveModeling)
+
+data(AlzheimerDisease)
+
+adData = data.frame(diagnosis,predictors)
+
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+
+training = adData[ inTrain,]
+
+testing = adData[-inTrain,]
+
+-/code-
+
+Set the seed to 62433 and predict diagnosis with all the other variables using a random forest ("rf"), boosted trees ("gbm") and linear discriminant analysis ("lda") model. Stack the predictions together using random forests ("rf"). What is the resulting accuracy on the test set? Is it better or worse than each of the individual predictions?
+
+##Answer
+
+```{r question2}
+library(caret)
+library(gbm)
+set.seed(3433)
+library(AppliedPredictiveModeling)
+data(AlzheimerDisease)
+adData = data.frame(diagnosis,predictors)
+inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
+training = adData[ inTrain,]
+testing = adData[-inTrain,]
+set.seed(62433)
+library(parallel)
+library(doParalllel)
+library(doParallel)
+cluster <- makeCluster(detectCores()-1)
+registerDoParallel(cluster)
+fitControl <- trainControl(allowParallel=TRUE)
+mod_rf <- train(diagnosis ~ .,method="rf",data=training,trControl=fitControl)
+mod_gbm <- train(diagnosis ~ .,method="gbm",data=training)
+mod_lda <- train(diagnosis  ~.,method="lda",data=training)
+pred_rf <- predict(mod_rf,testing)
+pred_gbm <- predict(mod_gbm,testing)
+pred_lda <- predict(mod_lda,testing)
+predDF <- data.frame(pred_rf,pred_gbm,pred_lda,diagnosis=testing$diagnosis)
+mod_comb_rf <- train(diagnosis ~.,method="rf",data=predDF,trControl=fitControl)
+confusionMatrix(predict(mod_rf,testing),testing$diagnosis)
+confusionMatrix(predict(mod_gbm,testing),testing$diagnosis)
+confusionMatrix(predict(mod_lda,testing),testing$diagnosis)
+confusionMatrix(predict(mod_comb_rf,testing),testing$diagnosis)
+```
+
+#Question 3
+Load the concrete data with the commands:
+
+-code-
+
+set.seed(3523)
+
+library(AppliedPredictiveModeling)
+
+data(concrete)
+
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+
+training = concrete[ inTrain,]
+
+testing = concrete[-inTrain,]
+
+-/code-
+
+Set the seed to 233 and fit a lasso model to predict Compressive Strength. Which variable is the last coefficient to be set to zero as the penalty increases? (Hint: it may be useful to look up ?plot.enet).
+
+#Answer
+
+```{r question3}
+set.seed(3523)
+library(AppliedPredictiveModeling)
+data(concrete)
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+training = concrete[ inTrain,]
+testing = concrete[-inTrain,]
+set.seed(233)
+names(training)
+modFit <- train(CompressiveStrength ~.,method="lasso",data=training)
+plot(modFit$finalModel,xvar="penalty")
+```
+
+The final coeff to be set to zero as the penalty increases is cement.
+
+#Question 4
+
+Load the data on the number of visitors to the instructors blog from here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/gaData.csv
+
+Using the commands:
+
+-code-library(lubridate) # For year() function below
+
+dat = read.csv("~/Desktop/gaData.csv")
+
+training = dat[year(dat$date) < 2012,]
+
+testing = dat[(year(dat$date)) > 2011,]
+
+tstrain = ts(training$visitsTumblr)
+
+-/code-
+
+Fit a model using the bats() function in the forecast package to the training time series. Then forecast this model for the remaining time points. For how many of the testing points is the true value within the 95% prediction interval bounds?
+
+##Answer
+
+```{r question4}
+library(lubridate)
+library(forecast)
+dat <- read.csv("./data/gaData.csv")
+training = dat[year(dat$date) < 2012,]
+testing = dat[(year(dat$date)) > 2011,]
+tstrain = ts(training$visitsTumblr)
+fit <- bats(tstrain)
+fc <- forecast(fit,level=95,h=dim(dat)[[1]]-dim(training)[[1]])
+upper_bound <- fc$upper[,1]
+dim(testing[testing$visitsTumblr<upper_bound,])[[1]]/dim(testing)[[1]]
+```
+
+#Question-5
+
+Load the concrete data with the commands:
+
+-code-
+
+set.seed(3523)
+
+library(AppliedPredictiveModeling)
+
+data(concrete)
+
+inTrain = createDataPartition(concrete$CompressiveStrength, p = 3/4)[[1]]
+
+training = concrete[ inTrain,]
+
+testing = concrete[-inTrain,]
+
+-/code-
+
+Set the seed to 325 and fit a support vector machine using the e1071 package to predict Compressive Strength using the default settings. Predict on the testing set. What is the RMSE?
+
+##Answer
+
